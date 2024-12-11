@@ -6,6 +6,7 @@
     <title>Google Drive File Upload</title>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://apis.google.com https://accounts.google.com 'unsafe-inline';">
     <style>
         body { font-family: Arial, sans-serif; }
         #fileList { margin-top: 20px; }
@@ -54,15 +55,15 @@
                         }).then((response) => {
                             folderId = response.result.id;
                             listFiles();
-                        });
-                    });
-                });
+                        }).catch(error => console.error('Error creating folder:', error));
+                    }).catch(error => console.error('Error signing in:', error));
+                }).catch(error => console.error('Error initializing Google API:', error));
             });
         }
 
         document.getElementById('uploadBtn').addEventListener('click', () => {
             const file = document.getElementById('fileInput').files[0];
-            if (file) {
+            if (file && folderId) {
                 const form = new FormData();
                 form.append('metadata', new Blob([JSON.stringify({
                     name: file.name,
@@ -75,7 +76,8 @@
                     headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
                     body: form
                 }).then(response => response.json())
-                  .then(() => listFiles());
+                  .then(() => listFiles())
+                  .catch(error => console.error('Error uploading file:', error));
             }
         });
 
@@ -91,7 +93,7 @@
                     li.innerHTML = `<a href="${file.webViewLink}" target="_blank">${file.name}</a>`;
                     fileList.appendChild(li);
                 });
-            });
+            }).catch(error => console.error('Error listing files:', error));
         }
     </script>
 </body>
