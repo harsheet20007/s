@@ -3,97 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Drive File Upload</title>
-    <script src="https://apis.google.com/js/api.js"></script>
+    <title>Google Drive Integration</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://apis.google.com https://accounts.google.com 'unsafe-inline';">
-    <style>
-        body { font-family: Arial, sans-serif; }
-        #fileList { margin-top: 20px; }
-        .hidden { display: none; }
-    </style>
+    <script src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
-    <h1>Google Drive File Upload</h1>
+    <h1>Google Drive File Manager</h1>
     <div id="g_id_onload"
          data-client_id="678872323392-9mfrt7ngfbfme0nhgc32uqljqpctvjnm.apps.googleusercontent.com"
          data-callback="handleCredentialResponse">
     </div>
     <div class="g_id_signin" data-type="standard"></div>
 
-    <input type="file" id="fileInput" class="hidden">
-    <button id="uploadBtn" class="hidden">Upload File</button>
-    
-    <h2>Uploaded Files</h2>
+    <button onclick="listFiles()">List Files</button>
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">Upload File</button>
+
     <ul id="fileList"></ul>
 
     <script>
-        let accessToken;
-        let folderId;
+        let folderId = null;
 
         function handleCredentialResponse(response) {
-            accessToken = response.credential;
-            document.getElementById('uploadBtn').classList.remove('hidden');
-            document.getElementById('fileInput').classList.remove('hidden');
-            createFolder();
+            const token = response.credential;
+            gapi.load('client:auth2', initClient);
         }
 
-        function createFolder() {
-            gapi.load('client:auth2', () => {
-                gapi.client.init({
-                    apiKey: 'AIzaSyC3m2Q47SiDG4fM6YRWSzIP-vG3WVlnaZE',
-                    clientId: '678872323392-9mfrt7ngfbfme0nhgc32uqljqpctvjnm.apps.googleusercontent.com',
-                    scope: 'https://www.googleapis.com/auth/drive.file',
-                }).then(() => {
-                    gapi.auth2.getAuthInstance().signIn().then(() => {
-                        gapi.client.drive.files.create({
-                            resource: {
-                                'name': 'MyAppFolder',
-                                'mimeType': 'application/vnd.google-apps.folder'
-                            },
-                            fields: 'id'
-                        }).then((response) => {
-                            folderId = response.result.id;
-                            listFiles();
-                        }).catch(error => console.error('Error creating folder:', error));
-                    }).catch(error => console.error('Error signing in:', error));
-                }).catch(error => console.error('Error initializing Google API:', error));
+        function initClient() {
+            gapi.client.init({
+                apiKey: 'AIzaSyC3m2Q47SiDG4fM6YRWSzIP-vG3WVlnaZE',
+                clientId: '678872323392-9mfrt7ngfbfme0nhgc32uqljqpctvjnm.apps.googleusercontent.com',
+                discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+                scope: 'https://www.googleapis.com/auth/drive.file'
+            }).then(function () {
+                return gapi.auth2.getAuthInstance().signIn();
+            }).then(function () {
+                createFolder("MyWebsiteFolder");
+            }).catch(function (error) {
+                console.error("Error initializing Google API client: ", error);
             });
         }
 
-        document.getElementById('uploadBtn').addEventListener('click', () => {
-            const file = document.getElementById('fileInput').files[0];
-            if (file && folderId) {
-                const form = new FormData();
-                form.append('metadata', new Blob([JSON.stringify({
-                    name: file.name,
-                    parents: [folderId]
-                })], { type: 'application/json' }));
-                form.append('file', file);
-
-                fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                    method: 'POST',
-                    headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
-                    body: form
-                }).then(response => response.json())
-                  .then(() => listFiles())
-                  .catch(error => console.error('Error uploading file:', error));
-            }
-        });
+        function createFolder(folderName) {
+            gapi.client.drive.files.create({
+                resource: {
+                    'name': folderName,
+                    'mimeType': 'application/vnd.google-apps.folder'
+                },
+                fields: 'id'
+            }).then(function(response) {
+                folderId = response.result.id;
+                console.log('Folder ID: ', folderId);
+            }).catch(function (error) {
+                console.error("Error creating folder: ", error);
+            });
+        }
 
         function listFiles() {
+            if (!folderId) {
+                alert("Folder not created yet!");
+                return;
+            }
             gapi.client.drive.files.list({
-                q: `'${folderId}' in parents`,
-                fields: 'files(id, name, webViewLink)'
-            }).then((response) => {
+                'q': `'${folderId}' in parents`,
+                'fields': "nextPageToken, files(id, name)"
+            }).then(function(response) {
+                const files = response.result.files;
                 const fileList = document.getElementById('fileList');
                 fileList.innerHTML = '';
-                response.result.files.forEach(file => {
+                if (files && files.length > 0) {
+                    files.forEach(file => {
+                        const li = document.createElement('li');
+                        li.textContent = file.name;
+                        fileList.appendChild(li);
+                    });
+                } else {
                     const li = document.createElement('li');
-                    li.innerHTML = `<a href="${file.webViewLink}" target="_blank">${file.name}</a>`;
+                    li.textContent = 'No files found.';
                     fileList.appendChild(li);
-                });
-            }).catch(error => console.error('Error listing files:', error));
+                }
+            }).catch(function (error) {
+                console.error("Error listing files: ", error);
+            });
+        }
+
+        function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file || !folderId) {
+                alert("Please select a file and ensure the folder is created.");
+                return;
+            }
+
+            const metadata = {
+                'name': file.name,
+                'parents': [folderId]
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+            form.append('file', file);
+
+            fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: new Headers({'Authorization': 'Bearer ' + gapi.auth.getToken().access_token}),
+                body: form
+            }).then((res) => res.json())
+              .then(function(val) {
+                console.log("Uploaded file ID: ", val.id);
+                listFiles(); // Refresh the file list
+            }).catch(function (error) {
+                console.error("Error uploading file: ", error);
+            });
         }
     </script>
 </body>
