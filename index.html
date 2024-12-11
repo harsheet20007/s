@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive File Upload</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #fileList { margin-top: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Google Drive File Upload</h1>
+    <div id="g_id_onload"
+         data-client_id="977038537918-7k4g6gql6148mjb3saq0m04l6gk3hmas.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+
+    <input type="file" id="fileInput" class="hidden">
+    <button id="uploadBtn" class="hidden">Upload File</button>
+    
+    <h2>Uploaded Files</h2>
+    <ul id="fileList"></ul>
+
+    <script>
+        let accessToken;
+        let folderId;
+
+        function handleCredentialResponse(response) {
+            accessToken = response.credential;
+            document.getElementById('uploadBtn').classList.remove('hidden');
+            document.getElementById('fileInput').classList.remove('hidden');
+            createFolder();
+        }
+
+        function createFolder() {
+            gapi.load('client:auth2', () => {
+                gapi.client.init({
+                    apiKey: 'AIzaSyBJLp1AAqdEVxs-eZBUPPgNfK-SjOuLpz0',
+                    clientId: '977038537918-7k4g6gql6148mjb3saq0m04l6gk3hmas.apps.googleusercontent.com',
+                    scope: 'https://www.googleapis.com/auth/drive.file',
+                }).then(() => {
+                    gapi.auth2.getAuthInstance().signIn().then(() => {
+                        gapi.client.drive.files.create({
+                            resource: {
+                                'name': 'MyAppFolder',
+                                'mimeType': 'application/vnd.google-apps.folder'
+                            },
+                            fields: 'id'
+                        }).then((response) => {
+                            folderId = response.result.id;
+                            listFiles();
+                        });
+                    });
+                });
+            });
+        }
+
+        document.getElementById('uploadBtn').addEventListener('click', () => {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) {
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify({
+                    name: file.name,
+                    parents: [folderId]
+                })], { type: 'application/json' }));
+                form.append('file', file);
+
+                fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: new Headers({ 'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }),
+                    body: form
+                }).then(response => response.json())
+                  .then(() => listFiles());
+            }
+        });
+
+        function listFiles() {
+            gapi.client.drive.files.list({
+                q: `'${folderId}' in parents`,
+                fields: 'files(id, name, webViewLink)'
+            }).then((response) => {
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+                response.result.files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="${file.webViewLink}" target="_blank">${file.name}</a>`;
+                    fileList.appendChild(li);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
