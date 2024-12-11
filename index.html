@@ -16,7 +16,7 @@
 <body>
     <h1>Google Drive File Upload</h1>
     <div id="g_id_onload"
-         data-client_id="977038537918-7k4g6gql6148mjb3saq0m04l6gk3hmas.apps.googleusercontent.com"
+         data-client_id="977038537918-54nkpare1flpt274m97v1h65o23rujel.apps.googleusercontent.com"
          data-callback="handleCredentialResponse">
     </div>
     <div class="g_id_signin" data-type="standard"></div>
@@ -41,8 +41,8 @@
         function createFolder() {
             gapi.load('client:auth2', () => {
                 gapi.client.init({
-                    apiKey: 'AIzaSyBJLp1AAqdEVxs-eZBUPPgNfK-SjOuLpz0',
-                    clientId: '977038537918-7k4g6gql6148mjb3saq0m04l6gk3hmas.apps.googleusercontent.com',
+                    apiKey: 'AIzaSyD06S60-TYi-6zTXPuI3D0V0tRb1u1oWV0',
+                    clientId: '977038537918-54nkpare1flpt274m97v1h65o23rujel.apps.googleusercontent.com',
                     scope: 'https://www.googleapis.com/auth/drive.file',
                 }).then(() => {
                     gapi.auth2.getAuthInstance().signIn().then(() => {
